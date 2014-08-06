@@ -1,0 +1,18 @@
+/**
+ * @defgroup phobosfirmware_components Phobos Firmware Components
+ * */
+
+/**
+ * @mainpage Phobos Firmware Documentation
+ *
+ * @section overview Overview
+ *
+ * Phobos Firmware was written by the Chicago Engineering Design Team for use
+ * in the Intelligent Ground Vehicles Competition (IGVC). Phobos Firmware
+ * encompasses all embedded system code written for the IGVC autonomous robot.
+ * The embedded modules can either be stand-alone systems or interact with the
+ * main Phobos system. 
+ *
+ * @author Chicago Engineering Design Team chicagoedt@gmail.com
+ *
+ * */

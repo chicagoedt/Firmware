@@ -1,0 +1,14 @@
+/**
+ * @defgroup phobosfirmware_component_control_panel Control Panel
+ * @ingroup phobosfirmware_components
+ *
+ * @brief The emergency stop is a device on the robot that will stop the robot
+ * immediately when activated.
+ * 
+ * The emergency stop is composed of two modules. The first module is a
+ * receiver on the robot which listens for a signal from the transmitter and
+ * also monitors a switch onboard the robot The receiver is responsible for
+ * cutting or providing power to the robot's motors. The second module is a
+ * wireless transmitter that sends STOP or GO signals to the receiver.
+ *
+ * */

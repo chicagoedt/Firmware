@@ -1,0 +1,51 @@
+/*!
+@ingroup phobosfirmware_components
+@defgroup phobosfirmware_component_drivetrain_legacy Drive Train (Legacy)
+@brief Drive Train (Legacy) Microcontroller Code
+
+  
+@verbatim
+Chicago Engineering Design Team
+Nick Novak 4-14-08
+IGVC 2008 Achilles
+Version 1.1
+@endverbatim
+
+
+@par --Description of Operation--
+
+
+This program serves as interface between the computer control 
+system and the drive train.@n
+@n
+The control system will send out
+an 8-bit number, through the serial port.  The uC has an automated
+serial interface that will read the incoming 8 bit number.  The 8-bit 
+number will control the length of the high pulse of the PWM.  Ultimately
+this controls the speed of the motor.  Attach near one of the sprockets
+on the drive train is a quadrature wheel encoder.  This device will allow
+us to detect the speed of the wheel and the direction.  The direction and 
+speed of the wheel will be sent out as an 8-bit number through the serial 
+port back to the control program. Bit 7 is the direction, 0-forward
+and 1-reverse, bits 0-6 gives you ticks per 0.1s. That gives you a limit 
+of 127 ticks per 0.1s
+
+
+
+@par --Hardware--
+
+@em Microcontroller: MicroStamp11 [Motorola MC68HC11D0] @n
+                 http://www.freescale.com/files/microcontrollers/doc/data_sheet/MC68HC711D3.pdf
+
+
+@par --Software--
+
+@em Assembly: @n
+    Assemble with @b MiniIDE [MGTEK, http://www.mgtek.com/miniide], ASM11/68HC11 cross assembler
+
+
+@em Flashing: @n
+    Flash with @b MicroLoad [Technological Arts, http://www.technologicalarts.com/myfiles/microload.html]@n
+    This requires usage of a serial port.
+
+*/

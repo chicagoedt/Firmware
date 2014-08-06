@@ -1,0 +1,10 @@
+/*!
+  @mainpage Phobos Firmware
+
+  This is documentation for Phobos Firmware.
+
+*/
+
+/*! @defgroup phobosfirmware_components Components
+    @brief Components in Phobos Firmware
+*/

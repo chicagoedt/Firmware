@@ -1,4 +1,4 @@
 Firmware
 ========
 
-Atmel microcontroller code for all projects.
+All projects firmware code.
