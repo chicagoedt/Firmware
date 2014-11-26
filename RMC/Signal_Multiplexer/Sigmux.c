@@ -8,7 +8,7 @@
  *
  *
  *Date Created:		09/05/2013
- *Last Date Modified:	08/14/2014
+ *Last Date Modified:	11/24/2014
  *Last Modified by:	John Sabino
  *
  *
@@ -108,6 +108,8 @@
  *			   a one second delay before it enters.	
  *	4.3 (06/27/2014) - Added a preprocessor flag for the TWI system called TWI_ENABLED. Added TWI related
  *			   macros. Added PinB4 as TWI Error LED.
+ *	4.4 (11/24/2014) - Modified Decrypt_Data() to accomodate for a command change.
+ *
  *	
  *TODO/NOTES:
  *	- See if there is a faster way to do delay commands rather than through 'util/delay.h' (if needed).  
@@ -293,7 +295,7 @@ is enabled then test code will be compiled otherwise it will be ignored.
 #define Source_IP				"192.168.2.10"	//Set this to whatever the IP of the transmitter is.
 #define ROUTER_SSID				"Team_27"	//"Tomato24"
 #define SSID_LENGTH				(7)	
-#define CC3000_APP_BUFFER_SIZE			(1)		//(5)
+#define CC3000_APP_BUFFER_SIZE			(2)		//(5)
 #define CC3000_RX_BUFFER_OVERHEAD_SIZE		(20)
 #define DHCP_Complete				(PORTC & (1 << PC6))	
 
@@ -425,12 +427,8 @@ typedef struct {
 //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 //Function Prototypes:
 inline void Initialization(void);
-//static uint8_t Update_CC3000(unsigned char* SSID, unsigned long SSID_Length, unsigned char* BSSID);
 uint8_t Set_Mode(uint8_t Mode);
-//uint8_t Control_Motor(Motor_Controller_Command * Command);
-//uint8_t Send_Serial_Data(char OpCode[], uint8_t OpCode_Length, int16_t Data[], uint8_t Data_Length);
 void Select_Motor_Controller(uint8_t Motor);
-//uint8_t Decrypt_Data(unsigned char Data);
 
 #ifdef USB_ENABLED
 	inline void Enable_USB_Controller(void);
@@ -450,9 +448,7 @@ void Select_Motor_Controller(uint8_t Motor);
 	
 	//Functions to utilize the CC3000:
 	uint8_t Recieve_WiFi_Data(void);
-//	inline void Recieve_WiFi_Data(void);
-	uint8_t Decrypt_Data(unsigned char Data);
-//	inline void Decrypt_Data(unsigned char Data);
+	uint8_t Decrypt_Data(unsigned char * Data);
 #endif	//End CC3000_ENABLED
 
 #ifdef TWI_ENABLED
@@ -902,8 +898,8 @@ uint8_t Set_Mode(uint8_t New_Mode)
 
 	if (New_Mode == Current_Mode)	{return Current_Mode;}
 
-	unsigned char Kill_Command[] = {'!', 'E', 'X', '\r'};//"!EX\r";
-	unsigned char Go_Command[] = {'!', 'M', 'G', '\r'};//"!MG\r";
+	unsigned char Kill_Command[] = {'@', '0', '0', '!', 'E', 'X', '\r'};//"!EX\r";
+	unsigned char Go_Command[] = {'@', '0', '0', '!', 'M', 'G', '\r'};//"!MG\r";
 
 	switch (New_Mode)
 	{
@@ -922,10 +918,10 @@ uint8_t Set_Mode(uint8_t New_Mode)
 					//unsigned char Kill_Command[] = "!EX\r";
 			
 					Select_Motor_Controller(1);
-					USART_Transmit(Kill_Command, 4);
+					USART_Transmit(Kill_Command, 7);
 			
 					Select_Motor_Controller(2);
-                        		USART_Transmit(Kill_Command, 4);
+                        		USART_Transmit(Kill_Command, 7);
 					
 					//Stop the Linear Actuator 01/11
                                         //PORTD &= ~(1 << PD7);
@@ -964,26 +960,16 @@ uint8_t Set_Mode(uint8_t New_Mode)
 					//unsigned char Go_Command[] = "!MG\r";
                         
                         		Select_Motor_Controller(1);
-                        		USART_Transmit(Go_Command, 4);
+                        		USART_Transmit(Go_Command, 7);
 
                         		Select_Motor_Controller(2);
-                        		USART_Transmit(Go_Command, 4);				
+                        		USART_Transmit(Go_Command, 7);				
 					
 					PORTC |= (1 << PORTC7);
 				break;
 			}//End switch
 		break;
 
-/*
-		case Upload_Mode:
-			//Enable USB communications to the computer:
-			#ifdef USB_ENABLED
-				Enable_USB_Controller();
-			#endif
-			//Do not listen for any of the motor controller commands, only CC3000 uploads.
-			//Send neutral signal to motor controllers (or if we could disable them...).
-		break;
-*/
 		default:
 			//Invalid input: 
 			return -1;
@@ -1129,12 +1115,9 @@ void WLAN_Interrupt_Disable()
 //--------------------------------------------------------
 
 uint8_t Recieve_WiFi_Data()
-//inline void Recieve_WiFi_Data()
 {
-	unsigned char Temp_Buffer[1];
+	unsigned char Temp_Buffer[2];
         unsigned long Rx_Packet_Length = 0;
-	//uint8_t Index = 0;
-	//uint8_t End_Found = 0;
 	
 	switch(Socket_Handle)
 	{
@@ -1143,66 +1126,24 @@ uint8_t Recieve_WiFi_Data()
 		break;
 
 		case 0:
-//			return -1;
 		break;
 	}//End switch
 
-        //memset((unsigned char *) &Temp_Buffer, 0, sizeof(Temp_Buffer));		
 	Temp_Buffer[0] = 0;
+	Temp_Buffer[1] = 0;
 
         //Begin receiving data:
         recvfrom(Socket_Handle, Temp_Buffer, CC3000_APP_BUFFER_SIZE, 0, &Mission_Control_Address, &Rx_Packet_Length);	
-	//Since it matches the protocol, we need to keep scanning to find the deliminating character.
-/*
-	while(!End_Found)
-	{
-		uint8_t i;
-
-		recvfrom(Socket_Handle,Temp_Buffer, CC3000_APP_BUFFER_SIZE, 0, &Mission_Control_Address, &Rx_Packet_Length);
-
-		for(i = 0; i < 5; ++i)
-		{
-			Data_Buffer[Index++] = Temp_Buffer[i];
-			
-			if (Temp_Buffer[i] == '\r')
-			{
-				End_Found = 1;
-				break;
-			}//End if
-		}//End for loop
-	}//End while loop	
-*/
+	
 	//Decipher the data transmitted to see if it matches the protocol (if it doesn't ERROR):
-	if(Temp_Buffer[0]) {Decrypt_Data(Temp_Buffer[0]);}
-/*        
-	switch(Data_Buffer[0])
-        {
-                case 48:                                //'0'
-                        Set_Mode(Safety_Mode);
-                break;
-                case 49:                                //'1'
-                        Set_Mode(RC_Mode);
-                        Select_Motor_Controller(1);
-                        USART_Transmit(Data_Buffer, Index);
-	        break;
-                case 50:                                //'2'
-                        Set_Mode(RC_Mode);
-                        Select_Motor_Controller(2);
-                        USART_Transmit(Data_Buffer, Index);
-                break;
-                case 51:                                //'3'
-                        Set_Mode(Autonomous_Mode);
-                break;
-                default:
-                        return -1;
-                break;
-        }//End Switch
-*/
+	if(Temp_Buffer[0]) {Decrypt_Data(Temp_Buffer);}
 	return 0;
 }//End Recieve_WiFi_Data
 #endif
 
-
+//////////////////////////////////////////////////
+///REMOVE?
+//////////////////////////////////////////////////
 void Select_Motor_Controller(uint8_t Motor)
 {
 	switch(Motor)
@@ -1594,83 +1535,111 @@ uint8_t Decrypt_Data(unsigned char Data)
 }//End Decrypt_Data
 */
 
-uint8_t Decrypt_Data(unsigned char Data)
+uint8_t Decrypt_Data(unsigned char * Data)
 {
+	//EECMDPPPPPDPPPPP
+	//EECMDPPP
+	//XX1XXXMM
+	
 	unsigned char Size = 0;
-	unsigned char Output_Command[11] = {'!', 'G', ' ', '1', ' '};
+	unsigned char Output_Command[14] = {'@', '0', ' ', '!', 'G', ' ', '1', ' '};
 
 	#ifdef WATCHDOG_ENABLED
 		//Feed_Watchdog();
 		wdt_reset();
 	#endif 	//End WATCHDOG_ENABLED
 
-	switch(Data)
+	//Is this a mode change command?
+	if (*Data & 0x20)
 	{
+		Set_Mode(*Data & 0x03);
+		return 0;
+	}//End if
+
+	//If we are not in RC Mode then don't process the rest of the command.
+	if (Current_Mode != RC_MODE)
+	{
+		return 2;	
+	}//End if
+
+
+	switch(*Data)
+	{
+	//NEW
+		case 0x01:
+
 		//Digging Mechanism Forward:
 		//	&		
 		//Left Wheel Forward:
 		case 111:		
 		case 71:
-			Output_Command[5] 	= '1';
-			Output_Command[6] 	= '0';
-			Output_Command[7] 	= '0';
-			Output_Command[8] 	= '0';
-			Output_Command[9]	= '\r';
-			Size 			= 10;
+			Output_Command[2] 	= '1';
+			Output_Command[8] 	= '1';
+			Output_Command[9] 	= '0';
+			Output_Command[10] 	= '0';
+			Output_Command[11] 	= '0';
+			Output_Command[12]	= '\r';
+			Size 			= 13;
 		break;
 
 		case 110:
 		case 70:
-			Output_Command[5] 	= '8';
-			Output_Command[6] 	= '5';
-			Output_Command[7] 	= '8';
-			Output_Command[8]	= '\r';
-			Size			= 9;
+			Output_Command[2] 	= '1';
+			Output_Command[8] 	= '8';
+			Output_Command[9] 	= '5';
+			Output_Command[10] 	= '8';
+			Output_Command[11]	= '\r';
+			Size			= 12;
 		break;
 
 		case 109:
 		case 69:
-			Output_Command[5] 	= '7';
-			Output_Command[6] 	= '1';
-			Output_Command[7] 	= '5';
-			Output_Command[8]	= '\r';
-			Size			= 9;
+			Output_Command[2] 	= '1';
+			Output_Command[8] 	= '7';
+			Output_Command[9] 	= '1';
+			Output_Command[10] 	= '5';
+			Output_Command[11]	= '\r';
+			Size			= 12;
 		break;	
 
 		case 108:
 		case 68:
-			Output_Command[5] 	= '5';
-			Output_Command[6] 	= '7';
-			Output_Command[7] 	= '2';
-			Output_Command[8]	= '\r';
-			Size			= 9;
+			Output_Command[2] 	= '1';
+			Output_Command[8] 	= '5';
+			Output_Command[9] 	= '7';
+			Output_Command[10] 	= '2';
+			Output_Command[11]	= '\r';
+			Size			= 12;
 		break;
 
 		case 107:
 		case 67:
-			Output_Command[5] 	= '4';
-			Output_Command[6] 	= '2';
-			Output_Command[7] 	= '9';
-			Output_Command[8]	= '\r';
-			Size			= 9;
+			Output_Command[2] 	= '1';
+			Output_Command[8] 	= '4';
+			Output_Command[9] 	= '2';
+			Output_Command[10] 	= '9';
+			Output_Command[11]	= '\r';
+			Size			= 12;
 		break;
 
 		case 106:
 		case 66:
-			Output_Command[5] 	= '2';
-			Output_Command[6] 	= '8';
-			Output_Command[7] 	= '6';
-			Output_Command[8]	= '\r';
-			Size			= 9;
+			Output_Command[2] 	= '1';
+			Output_Command[8] 	= '2';
+			Output_Command[9] 	= '8';
+			Output_Command[10] 	= '6';
+			Output_Command[11]	= '\r';
+			Size			= 12;
 		break;
 
 		case 105:
 		case 65:
-			Output_Command[5] 	= '1';
-			Output_Command[6] 	= '4';
-			Output_Command[7] 	= '3';
-			Output_Command[8]	= '\r';
-			Size			= 9;
+			Output_Command[2] 	= '1';
+			Output_Command[8] 	= '1';
+			Output_Command[9] 	= '4';
+			Output_Command[10] 	= '3';
+			Output_Command[11]	= '\r';
+			Size			= 12;
 		break;
 
 	//^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1682,10 +1651,10 @@ uint8_t Decrypt_Data(unsigned char Data)
 		//Left Wheel Stop:
 		case 72:
 		case 64:
-
-			Output_Command[5] 	= '0';
-			Output_Command[6]	= '\r';
-			Size			= 7;
+			Output_Command[2] 	= '1';
+			Output_Command[8] 	= '0';
+			Output_Command[9]	= '\r';
+			Size			= 10;
 		break;
 		
 		//Digging Mechanism Reverse:
@@ -1693,73 +1662,80 @@ uint8_t Decrypt_Data(unsigned char Data)
 		//Left Wheel Reverse:
 		case 103:
 		case 79:
-			Output_Command[5] 	= '-';
-			Output_Command[6] 	= '1';
-			Output_Command[7] 	= '0';
-			Output_Command[8]	= '0';
-			Output_Command[9]	= '0';
-			Output_Command[10]	= '\r';
-			Size			= 11;
+			Output_Command[2] 	= '1';
+			Output_Command[8] 	= '-';
+			Output_Command[9] 	= '1';
+			Output_Command[10] 	= '0';
+			Output_Command[11]	= '0';
+			Output_Command[12]	= '0';
+			Output_Command[13]	= '\r';
+			Size			= 14;
 		break;
 
 		case 102:
 		case 78:	
-			Output_Command[5] 	= '-';
-			Output_Command[6] 	= '8';
-			Output_Command[7] 	= '5';
-			Output_Command[8]	= '8';
-			Output_Command[9]	= '\r';
-			Size			= 10;
+			Output_Command[2] 	= '1';
+			Output_Command[8] 	= '-';
+			Output_Command[9] 	= '8';
+			Output_Command[10] 	= '5';
+			Output_Command[11]	= '8';
+			Output_Command[12]	= '\r';
+			Size			= 13;
 		break;
 	
 		case 101:
 		case 77:
-			Output_Command[5] 	= '-';
-			Output_Command[6] 	= '7';
-			Output_Command[7] 	= '1';
-			Output_Command[8]	= '5';
-			Output_Command[9]	= '\r';
-			Size			= 10;
+			Output_Command[2] 	= '1';
+			Output_Command[8] 	= '-';
+			Output_Command[9] 	= '7';
+			Output_Command[10] 	= '1';
+			Output_Command[11]	= '5';
+			Output_Command[12]	= '\r';
+			Size			= 13;
 		break;
 
 		case 100:
 		case 76:
-			Output_Command[5] 	= '-';
-			Output_Command[6] 	= '5';
-			Output_Command[7] 	= '7';
-			Output_Command[8]	= '2';
-			Output_Command[9]	= '\r';
-			Size			= 10;
+			Output_Command[2] 	= '1';
+			Output_Command[8] 	= '-';
+			Output_Command[9] 	= '5';
+			Output_Command[10] 	= '7';
+			Output_Command[11]	= '2';
+			Output_Command[12]	= '\r';
+			Size			= 13;
 		break;
 
 		case 99:
 		case 75:
-			Output_Command[5] 	= '-';
-			Output_Command[6] 	= '4';
-			Output_Command[7] 	= '2';
-			Output_Command[8]	= '9';
-			Output_Command[9]	= '\r';
-			Size			= 10;
+			Output_Command[2] 	= '1';
+			Output_Command[8] 	= '-';
+			Output_Command[9] 	= '4';
+			Output_Command[10] 	= '2';
+			Output_Command[11]	= '9';
+			Output_Command[12]	= '\r';
+			Size			= 13;
 		break;
 
 		case 98:
 		case 74:
-			Output_Command[5] 	= '-';
-			Output_Command[6] 	= '2';
-			Output_Command[7] 	= '8';
-			Output_Command[8]	= '6';
-			Output_Command[9]	= '\r';
-			Size			= 10;
+			Output_Command[2] 	= '1';
+			Output_Command[8] 	= '-';
+			Output_Command[9] 	= '2';
+			Output_Command[10] 	= '8';
+			Output_Command[11]	= '6';
+			Output_Command[12]	= '\r';
+			Size			= 13;
 		break;
 		
 		case 97:
 		case 73:
-			Output_Command[5] 	= '-';
-			Output_Command[6] 	= '1';
-			Output_Command[7] 	= '4';
-			Output_Command[8]	= '3';
-			Output_Command[9]	= '\r';
-			Size			= 10;	
+			Output_Command[2] 	= '1';
+			Output_Command[8] 	= '-';
+			Output_Command[9] 	= '1';
+			Output_Command[10] 	= '4';
+			Output_Command[11]	= '3';
+			Output_Command[12]	= '\r';
+			Size			= 13;	
 		break;
 
 	
@@ -1771,67 +1747,67 @@ uint8_t Decrypt_Data(unsigned char Data)
 	
 		//Right Wheel Forward:
 		case 87:
-			Output_Command[3]	= '2';
-			Output_Command[5] 	= '1';
-			Output_Command[6] 	= '0';
-			Output_Command[7] 	= '0';
-			Output_Command[8] 	= '0';
-			Output_Command[9]	= '\r';
-			Size 			= 10;
+			Output_Command[2] 	= '2';
+			Output_Command[8] 	= '1';
+			Output_Command[9] 	= '0';
+			Output_Command[10] 	= '0';
+			Output_Command[11] 	= '0';
+			Output_Command[12]	= '\r';
+			Size 			= 13;
 		break;
 
 		case 86:
-			Output_Command[3]	= '2';
-			Output_Command[5] 	= '8';
-			Output_Command[6] 	= '5';
-			Output_Command[7] 	= '8';
-			Output_Command[8] 	= '\r';
-			Size 			= 9;
+			Output_Command[2]	= '2';
+			Output_Command[8] 	= '8';
+			Output_Command[9] 	= '5';
+			Output_Command[10] 	= '8';
+			Output_Command[11] 	= '\r';
+			Size 			= 12;
 		break;
 
 		case 85:
-			Output_Command[3]	= '2';
-			Output_Command[5] 	= '7';
-			Output_Command[6] 	= '1';
-			Output_Command[7] 	= '5';
-			Output_Command[8] 	= '\r';
-			Size 			= 9;
+			Output_Command[2]	= '2';
+			Output_Command[8] 	= '7';
+			Output_Command[9] 	= '1';
+			Output_Command[10] 	= '5';
+			Output_Command[11] 	= '\r';
+			Size 			= 12;
 		break;
 
 		case 84:
-			Output_Command[3]	= '2';
-			Output_Command[5] 	= '5';
-			Output_Command[6] 	= '7';
-			Output_Command[7] 	= '2';
-			Output_Command[8] 	= '\r';
-			Size 			= 9;
+			Output_Command[2]	= '2';
+			Output_Command[8] 	= '5';
+			Output_Command[9] 	= '7';
+			Output_Command[10] 	= '2';
+			Output_Command[11] 	= '\r';
+			Size 			= 12;
 		break;
 
 		case 83:
-			Output_Command[3]	= '2';
-			Output_Command[5] 	= '4';
-			Output_Command[6] 	= '2';
-			Output_Command[7] 	= '9';
-			Output_Command[8] 	= '\r';
-			Size 			= 9;
+			Output_Command[2]	= '2';
+			Output_Command[8] 	= '4';
+			Output_Command[9] 	= '2';
+			Output_Command[10] 	= '9';
+			Output_Command[11] 	= '\r';
+			Size 			= 12;
 		break;
 
 		case 82:
-			Output_Command[3]	= '2';
-			Output_Command[5] 	= '2';
-			Output_Command[6] 	= '8';
-			Output_Command[7] 	= '6';
-			Output_Command[8] 	= '\r';
-			Size 			= 9;
+			Output_Command[2]	= '2';
+			Output_Command[8] 	= '2';
+			Output_Command[9] 	= '8';
+			Output_Command[10] 	= '6';
+			Output_Command[11] 	= '\r';
+			Size 			= 12;
 		break;
 
 		case 81:
-			Output_Command[3]	= '2';
-			Output_Command[5] 	= '1';
-			Output_Command[6] 	= '4';
-			Output_Command[7] 	= '3';
-			Output_Command[8] 	= '\r';
-			Size 			= 9;
+			Output_Command[2]	= '2';
+			Output_Command[8] 	= '1';
+			Output_Command[9] 	= '4';
+			Output_Command[10] 	= '3';
+			Output_Command[11] 	= '\r';
+			Size 			= 12;
 		break;
 		
 		//Linear Actuator OFF:
@@ -1847,10 +1823,10 @@ uint8_t Decrypt_Data(unsigned char Data)
 		//Right Wheel Stop:
 		case 80:
 		case 88:
-			Output_Command[3] 	= '2';
-			Output_Command[5]	= '0';
-			Output_Command[6]	= '\r';
-			Size 			= 7;	
+			Output_Command[2] 	= '2';
+			Output_Command[8]	= '0';
+			Output_Command[9]	= '\r';
+			Size 			= 10;	
 		break;
 	
 
@@ -1953,7 +1929,7 @@ uint8_t Decrypt_Data(unsigned char Data)
 
 		//All other commands:
 		default:
-			if (Data & 128) {return 0;}
+			if (*Data & 0x80 || *Data & 0x40) {return 0;}
 			Set_Mode(Safety_Mode);
 			return 1;
 		break;
