@@ -36,7 +36,8 @@
 /**
  * @brief Operating Frequency of uC in Hertz.
  */
-#define F_CPU 2000000UL
+//#define F_CPU 2000000UL
+#define F_CPU 4000000
 
 /**
  * @brief Baud rate of RS-232 communication in bps.
